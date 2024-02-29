@@ -52,13 +52,13 @@ class BertSelfAttention(nn.Module):
     ### TODO
 
     bs, num_attention_heads, seq_len, attention_head_size = key.size()
-    scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.attention_head_size))
-    if attention_mask is not None:
-      scores = scores + attention_mask
+    scores = (torch.matmul(query, key.transpose(-2, -1))) / torch.sqrt(torch.tensor(self.attention_head_size))
 
-    attention_weights = F.softmax(scores, 1)
+    scores = scores + attention_mask
 
-    weighted_values = torch.matmul(attention_weights, value)
+    scores = F.softmax(scores, 1)
+
+    weighted_values = torch.matmul(scores, value)
 
     concatenated_outputs = weighted_values.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
 
@@ -113,7 +113,7 @@ class BertLayer(nn.Module):
     output = dense_layer(output)
     output = input + dropout(output)
     output = ln_layer(output)
-    
+
     return output
 
   def forward(self, hidden_states, attention_mask):
@@ -184,6 +184,7 @@ class BertModel(BertPreTrainedModel):
 
     # Use pos_ids to get position embedding from self.pos_embedding into pos_embeds.
     pos_ids = self.position_ids[:, :seq_length]
+    pos_embeds = None
     ### TODO
 
     pos_embeds = self.pos_embedding(pos_ids)
