@@ -111,9 +111,9 @@ class BertLayer(nn.Module):
     # before it is added to the sub-layer input and normalized with a layer norm.
     ### TODO
     output = dense_layer(output)
-    output = dropout(output)
+    output = input + dropout(output)
 
-    output = ln_layer(input + output)
+    output = ln_layer(output)
 
 
     return output
@@ -137,9 +137,8 @@ class BertLayer(nn.Module):
     intermediate_output = self.interm_dense(attention_output)
     intermediate_output = self.interm_af(intermediate_output)
 
-    layer_output = self.out_dense(intermediate_output)
 
-    layer_output = self.add_norm(attention_output, layer_output, self.out_dense, self.out_dropout, self.out_layer_norm)
+    layer_output = self.add_norm(attention_output, intermediate_output, self.out_dense, self.out_dropout, self.out_layer_norm)
 
     return layer_output
 
@@ -189,7 +188,6 @@ class BertModel(BertPreTrainedModel):
 
     # Use pos_ids to get position embedding from self.pos_embedding into pos_embeds.
     pos_ids = self.position_ids[:, :seq_length]
-    pos_embeds = None
     ### TODO
 
     pos_embeds = self.pos_embedding(pos_ids)
@@ -202,9 +200,8 @@ class BertModel(BertPreTrainedModel):
 
     # Add three embeddings together; then apply embed_layer_norm and dropout and return.
     ### TODO
-    embeddings = inputs_embeds + pos_embeds + tk_type_embeds
 
-    embeddings = self.embed_layer_norm(embeddings)
+    embeddings = self.embed_layer_norm(inputs_embeds + pos_embeds + tk_type_embeds)
     embeddings = self.embed_dropout(embeddings)
 
     return embeddings
