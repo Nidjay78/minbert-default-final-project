@@ -51,15 +51,15 @@ class BertSelfAttention(nn.Module):
 
     ### TODO
 
+    bs, num_attention_heads, seq_len, attention_head_size = key.size()
     scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.attention_head_size))
     if attention_mask is not None:
-      scores += attention_mask
+      scores = scores + attention_mask
 
     attention_weights = F.softmax(scores, 1)
 
     weighted_values = torch.matmul(attention_weights, value)
 
-    bs, num_attention_heads, seq_len, attention_head_size = weighted_values.shape
     concatenated_outputs = weighted_values.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
 
     return concatenated_outputs
@@ -112,10 +112,8 @@ class BertLayer(nn.Module):
     ### TODO
     output = dense_layer(output)
     output = input + dropout(output)
-
     output = ln_layer(output)
-
-
+    
     return output
 
   def forward(self, hidden_states, attention_mask):
@@ -131,14 +129,13 @@ class BertLayer(nn.Module):
     ### TODO
     attention_output = self.self_attention(hidden_states, attention_mask)
 
-    attention_output = self.add_norm(hidden_states, attention_output, self.attention_dense, self.attention_dropout,
+    attention_norm_output = self.add_norm(hidden_states, attention_output, self.attention_dense, self.attention_dropout,
                                      self.attention_layer_norm)
 
-    intermediate_output = self.interm_dense(attention_output)
-    intermediate_output = self.interm_af(intermediate_output)
+    intermediate_output = self.interm_dense(attention_norm_output)
+    intermediate_af_output = self.interm_af(intermediate_output)
 
-
-    layer_output = self.add_norm(attention_output, intermediate_output, self.out_dense, self.out_dropout, self.out_layer_norm)
+    layer_output = self.add_norm(attention_norm_output, intermediate_af_output, self.out_dense, self.out_dropout, self.out_layer_norm)
 
     return layer_output
 
@@ -185,13 +182,11 @@ class BertModel(BertPreTrainedModel):
 
     inputs_embeds = self.word_embedding(input_ids)
 
-
     # Use pos_ids to get position embedding from self.pos_embedding into pos_embeds.
     pos_ids = self.position_ids[:, :seq_length]
     ### TODO
 
     pos_embeds = self.pos_embedding(pos_ids)
-
 
     # Get token type ids. Since we are not considering token type, this embedding is
     # just a placeholder.
