@@ -51,7 +51,7 @@ class BertSelfAttention(nn.Module):
 
     ### TODO
 
-    scores = torch.matmul(query, key.transpose(-2, -1))
+    scores = torch.matmul(query, key.transpose(-2, -1)) / torch.sqrt(torch.tensor(self.attention_head_size))
     if attention_mask is not None:
       scores += attention_mask
 
@@ -60,8 +60,7 @@ class BertSelfAttention(nn.Module):
     weighted_values = torch.matmul(attention_weights, value)
 
     bs, num_attention_heads, seq_len, attention_head_size = weighted_values.shape
-    hidden_size = num_attention_heads * attention_head_size
-    concatenated_outputs = weighted_values.permute(0, 2, 1, 3).reshape(bs, seq_len, hidden_size)
+    concatenated_outputs = weighted_values.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
 
     return concatenated_outputs
 
