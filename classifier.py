@@ -58,10 +58,9 @@ class BertSentimentClassifier(torch.nn.Module):
         # HINT: You should consider what is an appropriate return value given that
         # the training loop currently uses F.cross_entropy as the loss function.
         ### TODO
-        outputs = self.bert(input_ids, attention_mask)
-        cls_output = outputs.last_hidden_state[:,0,:]
-        cls_output = self.dropout(cls_output)
-        logits = self.classifier(cls_output)
+        pooler = self.bert(input_ids, attention_mask)['pooler_output']
+        outputs = self.dropout(pooler)
+        logits = self.proj(outputs)
 
 
 
