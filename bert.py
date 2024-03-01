@@ -52,22 +52,17 @@ class BertSelfAttention(nn.Module):
     ### TODO
 
     bs, num_attention_heads, seq_len, attention_head_size = key.size()
+    scores = (torch.matmul(query, key.transpose(-2, -1))) /  torch.sqrt(torch.tensor(self.attention_head_size))
 
+    scores = scores + attention_mask
 
-    S = (query @ key.transpose(-2, -1)) / torch.sqrt(
-    torch.tensor(self.attention_head_size)) 
+    scores = F.softmax(scores, dim =-1)
 
-    S = S + attention_mask
+    weighted_values = torch.matmul(scores, value)
 
+    concatenated_outputs = weighted_values.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)
 
-    S = F.softmax(S, dim=-1)
-
-    V = S @ value  
-
-
-    attn_value = V.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)  
-
-    return attn_value
+    return concatenated_outputs
     
   def forward(self, hidden_states, attention_mask):
     """
