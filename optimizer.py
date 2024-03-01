@@ -62,29 +62,24 @@ class AdamW(Optimizer):
                 ### TODO
                 if len(state) == 0:
                     # Keep track of Exponential Average
-                    state['step'] = 0
-                    state['exp_avg'] = torch.zeros_like(p.data)
-                    state['exp_avg_sq'] = torch.zeros_like(p.data)
+                    state['m'] = torch.zeros(grad.size(), dtype=torch.float32)
+                    state['v'] = torch.zeros(grad.size(), dtype=torch.float32)
+                    state['t'] = 0
 
-                exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
-                beta1, beta2 = group['betas']
+                beta_1, beta_2 = group['betas']
+                eps = group['eps']
+                weight_decay = group['weight_decay']
 
-                state['step'] += 1
+                state['t'] += 1
 
                 # Update biased first moment estimate
-                exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
-                # Update biased second raw moment estimate
-                exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
+                grad_t = grad + weight_decay * p.data
+                state['m'] = beta_1 * state['m'] + (1 - beta_1) * grad_t
+                state['v'] = beta_2 * state['v'] + (1 - beta_2) * grad_t ** 2
 
-                alpha *= math.sqrt((1 - beta2 ** state['step']))/(1 - beta1 ** state['step'])
+                alpha_t = alpha * math.sqrt(1.0 - beta_2 ** state['t']) / (1.0 - beta_1 ** state['t'])
+                p.data = p.data - (alpha_t * state['m']) / (torch.sqrt(state['v']) + eps) - alpha_t * weight_decay * p.data
 
-                denom = exp_avg_sq.sqrt().add_(group['eps'])
-                p.data.addcdiv_(exp_avg, denom, value=-alpha)
-                p.data -= alpha * group['weight_decay'] * p.data
-
-                state['step'] = 0
-                state['exp_avg'] = torch.zeros_like(p.data)
-                state['exp_avg_sq'] = torch.zeros_like(p.data)
 
 
         return loss
