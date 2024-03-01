@@ -68,6 +68,7 @@ class BertSelfAttention(nn.Module):
     attn_value = V.transpose(1, 2).contiguous().view(bs, seq_len, self.all_head_size)  
 
     return attn_value
+    
   def forward(self, hidden_states, attention_mask):
     """
     hidden_states: [bs, seq_len, hidden_state]
