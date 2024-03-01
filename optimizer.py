@@ -71,22 +71,20 @@ class AdamW(Optimizer):
 
                 state['step'] += 1
 
-                # Apply weight decay
-                if group['weight_decay'] != 0:
-                    grad.add_(p.data, alpha=group['weight_decay'])
-
                 # Update biased first moment estimate
                 exp_avg.mul_(beta1).add_(grad, alpha=1 - beta1)
                 # Update biased second raw moment estimate
                 exp_avg_sq.mul_(beta2).addcmul_(grad, grad, value=1 - beta2)
 
-                # Compute bias-corrected first moment estimate
-                corrected_exp_avg = exp_avg / (1 - beta1 ** state['step'])
-                # Compute bias-corrected second raw moment estimate
-                corrected_exp_avg_sq = exp_avg_sq / (1 - beta2 ** state['step'])
+                alpha *= math.sqrt((1 - beta2 ** state['step']))/(1 - beta1 ** state['step'])
 
-                denom = corrected_exp_avg_sq.sqrt().add_(group['eps'])
-                p.data.addcdiv_(corrected_exp_avg, denom, value=-alpha)
+                denom = exp_avg_sq.sqrt().add_(group['eps'])
+                p.data.addcdiv_(exp_avg, denom, value=-alpha)
+                p.data -= alpha * group['weight_decay'] * p.data
+
+                state['step'] = 0
+                state['exp_avg'] = torch.zeros_like(p.data)
+                state['exp_avg_sq'] = torch.zeros_like(p.data)
 
 
         return loss
