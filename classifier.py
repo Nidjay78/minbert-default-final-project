@@ -60,7 +60,7 @@ class BertSentimentClassifier(torch.nn.Module):
         ### TODO
         pooler = self.bert(input_ids, attention_mask)['pooler_output']
         outputs = self.dropout(pooler)
-        logits = self.proj(outputs)
+        logits = self.linear(outputs)
 
 
 
