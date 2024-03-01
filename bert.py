@@ -60,7 +60,7 @@ class BertSelfAttention(nn.Module):
 
     weighted_values = torch.matmul(scores, value)
 
-    cconcatenated_outputs = weighted_values.transpose(1, 2).reshape((bs, seq_len, self.all_head_size))
+    concatenated_outputs = weighted_values.transpose(1, 2).reshape((bs, seq_len, self.all_head_size))
 
     return concatenated_outputs
 
