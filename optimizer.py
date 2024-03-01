@@ -62,10 +62,12 @@ class AdamW(Optimizer):
                 ### TODO
                 if len(state) == 0:
                     # Keep track of Exponential Average
+                    state['t'] = 0
                     state['m'] = torch.zeros(grad.size(), dtype=torch.float32)
                     state['v'] = torch.zeros(grad.size(), dtype=torch.float32)
-                    state['t'] = 0
-
+                    state['m'] = state['m'].to(grad.device)
+                    state['v'] = state['v'].to(grad.device)
+                    
                 beta_1, beta_2 = group['betas']
                 eps = group['eps']
                 weight_decay = group['weight_decay']
