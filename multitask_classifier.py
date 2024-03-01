@@ -72,8 +72,9 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
         # You will want to add layers here to perform the downstream tasks.
         ### TODO
-        raise NotImplementedError
-
+        self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        self.paraphrase_classifier = nn.Linear(BERT_HIDDEN_SIZE * 2, 1)  # Concatenated embeddings for sentence pairs
+        self.similarity_regressor = nn.Linear(BERT_HIDDEN_SIZE * 2, 1)  # Concatenated embeddings for sentence pairs
 
     def forward(self, input_ids, attention_mask):
         'Takes a batch of sentences and produces embeddings for them.'
@@ -82,7 +83,9 @@ class MultitaskBERT(nn.Module):
         # When thinking of improvements, you can later try modifying this
         # (e.g., by adding other layers).
         ### TODO
-        raise NotImplementedError
+        outputs = self.bert(input_ids, attention_mask)
+        pooled_output = outputs.pooler_output
+        return pooled_output
 
 
     def predict_sentiment(self, input_ids, attention_mask):
@@ -92,18 +95,22 @@ class MultitaskBERT(nn.Module):
         Thus, your output should contain 5 logits for each sentence.
         '''
         ### TODO
-        raise NotImplementedError
+        pooled_output = self.forward(input_ids, attention_mask)
+        sentiment_logits = self.sentiment_classifier(pooled_output)
+        return sentiment_logits
 
 
-    def predict_paraphrase(self,
-                           input_ids_1, attention_mask_1,
-                           input_ids_2, attention_mask_2):
+    def predict_paraphrase(self,input_ids_1, attention_mask_1,input_ids_2, attention_mask_2):
         '''Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
         Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
         during evaluation.
         '''
         ### TODO
-        raise NotImplementedError
+        pooled_output_1 = self.forward(input_ids_1, attention_mask_1)
+        pooled_output_2 = self.forward(input_ids_2, attention_mask_2)
+        concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=1)
+        paraphrase_logit = self.paraphrase_classifier(concatenated_output)
+        return paraphrase_logit
 
 
     def predict_similarity(self,
@@ -113,9 +120,11 @@ class MultitaskBERT(nn.Module):
         Note that your output should be unnormalized (a logit).
         '''
         ### TODO
-        raise NotImplementedError
-
-
+        pooled_output_1 = self.forward(input_ids_1, attention_mask_1)
+        pooled_output_2 = self.forward(input_ids_2, attention_mask_2)
+        concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=1)
+        similarity_logit = self.similarity_regressor(concatenated_output)
+        return similarity_logit
 
 
 def save_model(model, optimizer, args, config, filepath):
