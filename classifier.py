@@ -48,8 +48,18 @@ class BertSentimentClassifier(torch.nn.Module):
 
         # Create any instance variables you need to classify the sentiment of BERT embeddings.
         ### TODO
+        self.lstm = torch.nn.LSTM(input_size=config.hidden_size,
+                            hidden_size=config.hidden_size,
+                            num_layers=1,
+                            batch_first=True,
+                            bidirectional=True)
+
+        self.conv1 =torch.nn.Conv1d(in_channels=config.hidden_size * 2,
+                               out_channels=config.hidden_size,
+                               kernel_size=3,
+                               padding=1)
         self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
-        self.classifier = torch.nn.Linear(self.bert.config.hidden_size, self.num_labels)
+        self.fc = torch.nn.Linear(self.bert.config.hidden_size, self.num_labels)
 
 
     def forward(self, input_ids, attention_mask):
@@ -58,10 +68,29 @@ class BertSentimentClassifier(torch.nn.Module):
         # HINT: You should consider what is an appropriate return value given that
         # the training loop currently uses F.cross_entropy as the loss function.
         ### TODO
-        pooler = self.bert(input_ids, attention_mask)['pooler_output']
-        outputs = self.dropout(pooler)
-        logits = self.classifier(outputs)
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
+        sequence_output = outputs.last_hidden_state  # (batch_size, sequence_length, hidden_size)
+
+        # LSTM layer
+        lstm_output, (hidden, cell) = self.lstm(sequence_output)  # (batch_size, sequence_length, hidden_size * 2)
+
+        # CNN layer
+        lstm_output = lstm_output.permute(0, 2, 1)  # Prepare for CNN (batch_size, hidden_size * 2, sequence_length)
+        conv_output = F.relu(self.conv1(lstm_output))  # (batch_size, hidden_size, sequence_length)
+        pooled_output = F.max_pool1d(conv_output, kernel_size=conv_output.shape[2]).squeeze(
+            2)  # (batch_size, hidden_size)
+
+        # Fully connected layer
+        logits = self.fc(self.dropout(pooled_output))  # (batch_size, num_labels)
+
         return logits
+
+        # pooler = self.bert(input_ids, attention_mask)['pooler_output']
+        # outputs = self.dropout(pooler)
+        # logits = self.classifier(outputs)
+        #
+        # return logits
+
 
 
 class SentimentDataset(Dataset):
