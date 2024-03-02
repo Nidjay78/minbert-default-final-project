@@ -72,9 +72,27 @@ class MultitaskBERT(nn.Module):
                 param.requires_grad = True
         # You will want to add layers here to perform the downstream tasks.
         ### TODO
+        self.sentiment_lstm = nn.LSTM(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE, batch_first=True)
+        # CNN layer for sentiment analysis.
+        self.sentiment_cnn = nn.Conv1d(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE, kernel_size=3, padding=1)
+
+        # LSTM layer for paraphrase detection.
+        self.paraphrase_lstm = nn.LSTM(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE, batch_first=True)
+        # CNN layer for paraphrase detection.
+        self.paraphrase_cnn = nn.Conv1d(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE, kernel_size=3, padding=1)
+
+        # LSTM layer for semantic textual similarity.
+        self.similarity_lstm = nn.LSTM(BERT_HIDDEN_SIZE * 2, BERT_HIDDEN_SIZE, batch_first=True)
+        # CNN layer for semantic textual similarity.
+        self.similarity_cnn = nn.Conv1d(BERT_HIDDEN_SIZE, BERT_HIDDEN_SIZE, kernel_size=3, padding=1)
+
+        # Define output layers for each task.
         self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
-        self.paraphrase_classifier = nn.Linear(BERT_HIDDEN_SIZE * 2, 1)  # Concatenated embeddings for sentence pairs
-        self.similarity_regressor = nn.Linear(BERT_HIDDEN_SIZE * 2, 1)  # Concatenated embeddings for sentence pairs
+        self.paraphrase_classifier = nn.Linear(BERT_HIDDEN_SIZE, 1)
+        self.similarity_regressor = nn.Linear(BERT_HIDDEN_SIZE, 1)
+        # self.sentiment_classifier = nn.Linear(BERT_HIDDEN_SIZE, N_SENTIMENT_CLASSES)
+        # self.paraphrase_classifier = nn.Linear(BERT_HIDDEN_SIZE * 2, 1)  # Concatenated embeddings for sentence pairs
+        # self.similarity_regressor = nn.Linear(BERT_HIDDEN_SIZE * 2, 1)  # Concatenated embeddings for sentence pairs
 
     def forward(self, input_ids, attention_mask):
         'Takes a batch of sentences and produces embeddings for them.'
@@ -87,6 +105,13 @@ class MultitaskBERT(nn.Module):
         pooled_output = outputs.pooler_output
         return pooled_output
 
+    def apply_lstm_cnn(self, lstm_layer, cnn_layer, lstm_input):
+        # LSTM followed by CNN.
+        lstm_output, (hidden, cell) = lstm_layer(lstm_input)
+        lstm_output = lstm_output.transpose(1, 2)  # Prepare for CNN (batch_size, channels, sequence_length)
+        cnn_output = F.relu(cnn_layer(lstm_output))
+        cnn_output = torch.max(cnn_output, 2)[0]  # Apply max-pooling.
+        return cnn_output
 
     def predict_sentiment(self, input_ids, attention_mask):
         '''Given a batch of sentences, outputs logits for classifying sentiment.
@@ -95,21 +120,34 @@ class MultitaskBERT(nn.Module):
         Thus, your output should contain 5 logits for each sentence.
         '''
         ### TODO
-        pooled_output = self.forward(input_ids, attention_mask)
-        sentiment_logits = self.sentiment_classifier(pooled_output)
+        # pooled_output = self.forward(input_ids, attention_mask)
+        # sentiment_logits = self.sentiment_classifier(pooled_output)
+        # return sentiment_logits
+        pooled_output = self.forward(input_ids, attention_mask).unsqueeze(1)  # Add sequence length of 1 for LSTM.
+        lstm_cnn_output = self.apply_lstm_cnn(self.sentiment_lstm, self.sentiment_cnn, pooled_output)
+        sentiment_logits = self.sentiment_classifier(lstm_cnn_output)
         return sentiment_logits
 
 
-    def predict_paraphrase(self,input_ids_1, attention_mask_1,input_ids_2, attention_mask_2):
+    def predict_paraphrase(self,
+                           input_ids_1, attention_mask_1,
+                           input_ids_2, attention_mask_2):
         '''Given a batch of pairs of sentences, outputs a single logit for predicting whether they are paraphrases.
         Note that your output should be unnormalized (a logit); it will be passed to the sigmoid function
         during evaluation.
         '''
         ### TODO
-        pooled_output_1 = self.forward(input_ids_1, attention_mask_1)
-        pooled_output_2 = self.forward(input_ids_2, attention_mask_2)
-        concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=1)
-        paraphrase_logit = self.paraphrase_classifier(concatenated_output)
+        # pooled_output_1 = self.forward(input_ids_1, attention_mask_1)
+        # pooled_output_2 = self.forward(input_ids_2, attention_mask_2)
+        # concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=1)
+        # paraphrase_logit = self.paraphrase_classifier(concatenated_output)
+        # return paraphrase_logit
+        pooled_output_1 = self.forward(input_ids_1, attention_mask_1).unsqueeze(1)
+        pooled_output_2 = self.forward(input_ids_2, attention_mask_2).unsqueeze(1)
+        concatenated_output = torch.cat((pooled_output_1, pooled_output_2),
+                                        dim=-1)  # Concatenate along the feature dimension.
+        lstm_cnn_output = self.apply_lstm_cnn(self.paraphrase_lstm, self.paraphrase_cnn, concatenated_output)
+        paraphrase_logit = self.paraphrase_classifier(lstm_cnn_output)
         return paraphrase_logit
 
 
@@ -120,10 +158,16 @@ class MultitaskBERT(nn.Module):
         Note that your output should be unnormalized (a logit).
         '''
         ### TODO
-        pooled_output_1 = self.forward(input_ids_1, attention_mask_1)
-        pooled_output_2 = self.forward(input_ids_2, attention_mask_2)
-        concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=1)
-        similarity_logit = self.similarity_regressor(concatenated_output)
+        # pooled_output_1 = self.forward(input_ids_1, attention_mask_1)
+        # pooled_output_2 = self.forward(input_ids_2, attention_mask_2)
+        # concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=1)
+        # similarity_logit = self.similarity_regressor(concatenated_output)
+        # return similarity_logit
+        pooled_output_1 = self.forward(input_ids_1, attention_mask_1).unsqueeze(1)
+        pooled_output_2 = self.forward(input_ids_2, attention_mask_2).unsqueeze(1)
+        concatenated_output = torch.cat((pooled_output_1, pooled_output_2), dim=-1)
+        lstm_cnn_output = self.apply_lstm_cnn(self.similarity_lstm, self.similarity_cnn, concatenated_output)
+        similarity_logit = self.similarity_regressor(lstm_cnn_output)
         return similarity_logit
 
 
