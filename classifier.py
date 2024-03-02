@@ -69,7 +69,7 @@ class BertSentimentClassifier(torch.nn.Module):
         # the training loop currently uses F.cross_entropy as the loss function.
         ### TODO
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
-        sequence_output = outputs.last_hidden_state  # (batch_size, sequence_length, hidden_size)
+        sequence_output = outputs['last_hidden_state']   # (batch_size, sequence_length, hidden_size)
 
         # LSTM layer
         lstm_output, (hidden, cell) = self.lstm(sequence_output)  # (batch_size, sequence_length, hidden_size * 2)
