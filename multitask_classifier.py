@@ -102,7 +102,7 @@ class MultitaskBERT(nn.Module):
         # (e.g., by adding other layers).
         ### TODO
         outputs = self.bert(input_ids, attention_mask)
-        pooled_output = outputs.pooler_output
+        pooled_output = outputs['pooler_output']
         return pooled_output
 
     def apply_lstm_cnn(self, lstm_layer, cnn_layer, lstm_input):
